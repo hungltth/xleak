@@ -14,7 +14,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual trigger: get latest release tag
-            TAG=$(gh api repos/greenwbm/xleak/releases/latest --jq '.tag_name')
+            TAG=$(gh api repos/bgreenwell/xleak/releases/latest --jq '.tag_name')
             echo "Using latest release: $TAG"
           else
             # Release trigger: use the tag from the event
