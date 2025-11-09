@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   create-release:
-    if: ${{ github.actor == 'greenwbm' }}
+    if: ${{ github.actor == 'bgreenwell' }}
 
     name: Create Release
     runs-on: ubuntu-latest
