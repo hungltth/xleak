@@ -185,6 +185,20 @@ Looking to view Word documents in the terminal? Check out **[doxx](https://githu
 - **clap** - elegant CLI argument parsing
 - **arboard** - cross-platform clipboard support
 
+## Troubleshooting
+
+**"File not found"**
+- Ensure the file path is correct
+- Use quotes if the filename has spaces: `xleak "My Report.xlsx"`
+
+**"No sheets found"**
+- The Excel file might be corrupted
+- Try opening it in Excel/LibreOffice first to verify
+
+**"Sheet 'X' not found"**
+- Run `xleak file.xlsx` (without --sheet) to see all available sheets
+- Sheet names are case-sensitive
+
 ## License
 
 MIT

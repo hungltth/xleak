@@ -30,7 +30,6 @@ xleak/
 │   └── display.rs         # Terminal display and export formatting
 ├── generate_test_data.py  # Python script to create test Excel files
 ├── README.md              # User-facing documentation
-├── QUICKSTART.md          # Getting started guide
 └── CLAUDE.md              # Context specific to Claude Code
 ```
 
