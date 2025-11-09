@@ -33,9 +33,35 @@ Inspired by [doxx](https://github.com/bgreenwell/doxx), `xleak` brings Excel spr
 
 ## Installation
 
+### Via Homebrew (macOS/Linux)
 ```bash
-# Install from source
-git clone <your-repo-url>
+brew tap bgreenwell/xleak
+brew install xleak
+```
+
+### Via Cargo
+```bash
+cargo install xleak
+```
+
+### Via Nix
+```bash
+# Run directly
+nix run github:bgreenwell/xleak -- file.xlsx
+
+# Install with flakes
+nix profile install github:bgreenwell/xleak
+
+# Or enter dev shell
+nix develop github:bgreenwell/xleak
+```
+
+### Pre-built Binaries
+Download pre-built binaries for Windows, Linux, and macOS from the [latest release](https://github.com/bgreenwell/xleak/releases/latest).
+
+### Build from Source
+```bash
+git clone https://github.com/bgreenwell/xleak.git
 cd xleak
 cargo install --path .
 ```
