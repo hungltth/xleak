@@ -1,0 +1,52 @@
+# xleak configuration file
+# Copy this file to: $XDG_CONFIG_HOME/xleak/config.toml (usually ~/.config/xleak/config.toml)
+#
+# Or specify a custom location with: xleak --config /path/to/config.toml file.xlsx
+
+[theme]
+# Default theme to use on startup
+# Options: "Default", "Dracula", "Solarized Dark", "Solarized Light", "GitHub Dark", "Nord"
+default = "Default"
+
+[ui]
+# Default maximum rows to display in non-interactive mode (0 = all)
+max_rows = 50
+
+# Default maximum column width in characters
+column_width = 30
+
+[keybindings]
+# Keybinding profile: "default" or "vim"
+# - "default": Standard arrow keys, Enter, etc.
+# - "vim": h/j/k/l navigation, y for yank (copy), etc.
+profile = "default"
+
+# Custom keybindings (optional - overrides profile)
+# Uncomment and modify to customize individual keys
+# Format: action = "key" or "Modifier+key" (e.g., "Ctrl+g", "Shift+Tab")
+#
+# [keybindings.custom]
+# quit = "q"
+# help = "?"
+# theme_toggle = "t"
+# search = "/"
+# next_match = "n"
+# prev_match = "N"  # Shift+n
+# copy_cell = "c"
+# copy_row = "C"    # Shift+c
+# jump = "Ctrl+g"
+# show_cell_detail = "Enter"
+# next_sheet = "Tab"
+# prev_sheet = "Shift+Tab"
+
+# Navigation keys (when using custom profile)
+# up = "Up"         # or "k" for vim-style
+# down = "Down"     # or "j" for vim-style
+# left = "Left"     # or "h" for vim-style
+# right = "Right"   # or "l" for vim-style
+# page_up = "PageUp"       # or "Ctrl+u" for vim-style
+# page_down = "PageDown"   # or "Ctrl+d" for vim-style
+# jump_to_top = "Ctrl+Home"      # or "g" for vim-style
+# jump_to_bottom = "Ctrl+End"    # or "G" for vim-style
+# jump_to_row_start = "Home"     # or "0" for vim-style
+# jump_to_row_end = "End"        # or "$" for vim-style

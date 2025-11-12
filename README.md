@@ -154,6 +154,88 @@ xleak data.xlsx -i --formulas
 xleak survey-results.xlsx --sheet "Responses" --export csv -n 0
 ```
 
+## Configuration
+
+xleak supports configuration via a TOML file for persistent settings like default theme and keybindings.
+
+### Config File Location
+
+**Default:** `~/.config/xleak/config.toml` (or `$XDG_CONFIG_HOME/xleak/config.toml`)
+
+**Custom:** Use `--config` flag to specify a different location:
+```bash
+xleak --config /path/to/config.toml file.xlsx -i
+```
+
+### Creating a Config File
+
+1. **Copy the example:**
+   ```bash
+   cp config.toml.example ~/.config/xleak/config.toml
+   ```
+
+2. **Or create manually:**
+   ```bash
+   mkdir -p ~/.config/xleak
+   cat > ~/.config/xleak/config.toml << 'EOF'
+   [theme]
+   default = "Dracula"
+
+   [ui]
+   max_rows = 50
+   column_width = 30
+
+   [keybindings]
+   profile = "default"
+   EOF
+   ```
+
+### Configuration Options
+
+#### Theme Settings
+```toml
+[theme]
+# Default theme to use on startup
+# Options: "Default", "Dracula", "Solarized Dark", "Solarized Light", "GitHub Dark", "Nord"
+default = "Dracula"
+```
+
+Press `t` in interactive mode to cycle through themes, or set your favorite as the default.
+
+#### UI Settings
+```toml
+[ui]
+# Default maximum rows in non-interactive mode
+max_rows = 50
+
+# Default maximum column width
+column_width = 30
+```
+
+#### Keybindings
+```toml
+[keybindings]
+# Keybinding profile: "default" or "vim"
+profile = "default"
+
+# Custom keybindings (optional)
+# [keybindings.custom]
+# quit = "q"
+# theme_toggle = "t"
+# search = "/"
+# copy_cell = "c"
+```
+
+**VIM Profile:**
+Set `profile = "vim"` to use VIM-style navigation:
+- `h/j/k/l` - left/down/up/right
+- `Ctrl+u/Ctrl+d` - page up/down
+- `gg/G` - jump to top/bottom
+- `0/$` - jump to row start/end
+- `y/Y` - copy cell/row (yank)
+
+See `config.toml.example` for all available options.
+
 ## Performance
 
 xleak is optimized for both small and large files:
