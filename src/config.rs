@@ -112,6 +112,7 @@ impl Config {
     }
 
     /// Create an example config file at the default location
+    #[allow(dead_code)]
     pub fn create_example() -> Result<PathBuf> {
         let config_path = Self::default_config_path()?;
         let config_dir = config_path

@@ -493,6 +493,8 @@ pub struct TuiState {
     progress: Option<ProgressInfo>, // Current operation progress
     // Theme state
     current_theme: Theme, // Current color theme
+    // Config state
+    config: crate::config::Config, // User configuration
 }
 
 impl TuiState {
@@ -546,6 +548,7 @@ impl TuiState {
             copy_feedback: None,
             progress: None,
             current_theme: Self::parse_theme_name(&config.theme.default),
+            config: config.clone(),
         })
     }
 
@@ -983,13 +986,20 @@ impl TuiState {
         )
     }
 
+    /// Check if a key press matches a configured action
+    fn key_matches(&self, code: KeyCode, modifiers: crossterm::event::KeyModifiers, action: &str) -> bool {
+        if let Some((expected_code, expected_mods)) = self.config.get_keybinding(action) {
+            code == expected_code && modifiers == expected_mods
+        } else {
+            false
+        }
+    }
+
     fn handle_event(&mut self, event: Event) {
         if let Event::Key(KeyEvent {
             code, modifiers, ..
         }) = event
         {
-            use crossterm::event::KeyModifiers;
-
             // If help is showing, any key closes it
             if self.show_help {
                 self.show_help = false;
@@ -1050,88 +1060,61 @@ impl TuiState {
                 return;
             }
 
-            // Normal navigation and commands
-            match code {
-                KeyCode::Char('q') => {
+            // Normal navigation and commands - using configured keybindings
+            // Check actions in order of priority
+            if self.key_matches(code, modifiers, "quit") {
+                self.should_quit = true;
+            } else if self.key_matches(code, modifiers, "help") {
+                self.show_help = true;
+            } else if self.key_matches(code, modifiers, "theme_toggle") {
+                self.current_theme = self.current_theme.next();
+            } else if self.key_matches(code, modifiers, "search") {
+                self.search_mode = true;
+                self.clear_search();
+            } else if self.key_matches(code, modifiers, "next_match") {
+                self.jump_to_next_match();
+            } else if self.key_matches(code, modifiers, "prev_match") {
+                self.jump_to_prev_match();
+            } else if self.key_matches(code, modifiers, "copy_cell") {
+                self.copy_current_cell();
+            } else if self.key_matches(code, modifiers, "copy_row") {
+                self.copy_current_row();
+            } else if self.key_matches(code, modifiers, "jump") {
+                self.enter_jump_mode();
+            } else if self.key_matches(code, modifiers, "show_cell_detail") {
+                self.show_cell_detail = true;
+            } else if self.key_matches(code, modifiers, "next_sheet") {
+                let _ = self.switch_to_next_sheet();
+            } else if self.key_matches(code, modifiers, "prev_sheet") || code == KeyCode::BackTab {
+                // BackTab is another way to detect Shift+Tab on some terminals
+                let _ = self.switch_to_prev_sheet();
+            } else if self.key_matches(code, modifiers, "up") {
+                self.move_up();
+            } else if self.key_matches(code, modifiers, "down") {
+                self.move_down();
+            } else if self.key_matches(code, modifiers, "left") {
+                self.move_left();
+            } else if self.key_matches(code, modifiers, "right") {
+                self.move_right();
+            } else if self.key_matches(code, modifiers, "jump_to_top") {
+                self.move_to_top();
+            } else if self.key_matches(code, modifiers, "jump_to_bottom") {
+                self.move_to_bottom();
+            } else if self.key_matches(code, modifiers, "jump_to_row_start") {
+                self.move_to_start_of_row();
+            } else if self.key_matches(code, modifiers, "jump_to_row_end") {
+                self.move_to_end_of_row();
+            } else if self.key_matches(code, modifiers, "page_up") {
+                self.page_up(10);
+            } else if self.key_matches(code, modifiers, "page_down") {
+                self.page_down(10);
+            } else if code == KeyCode::Esc {
+                // Special handling for Esc - clear search if active, otherwise quit
+                if !self.search_matches.is_empty() {
+                    self.clear_search();
+                } else {
                     self.should_quit = true;
                 }
-                KeyCode::Char('?') => {
-                    self.show_help = true;
-                }
-                KeyCode::Char('t') => {
-                    // Cycle to next theme
-                    self.current_theme = self.current_theme.next();
-                }
-                KeyCode::Char('/') => {
-                    // Enter search mode
-                    self.search_mode = true;
-                    self.clear_search();
-                }
-                KeyCode::Char('n') => {
-                    // Jump to next search match
-                    self.jump_to_next_match();
-                }
-                KeyCode::Char('N') => {
-                    // Jump to previous search match
-                    self.jump_to_prev_match();
-                }
-                KeyCode::Char('c') => {
-                    // Copy current cell
-                    self.copy_current_cell();
-                }
-                KeyCode::Char('C') => {
-                    // Copy current row
-                    self.copy_current_row();
-                }
-                KeyCode::Char('g') if modifiers.contains(KeyModifiers::CONTROL) => {
-                    // Enter jump mode (Ctrl+G)
-                    self.enter_jump_mode();
-                }
-                KeyCode::Enter => {
-                    // Show cell detail view
-                    self.show_cell_detail = true;
-                }
-                KeyCode::Esc => {
-                    // Clear search if active, otherwise quit
-                    if !self.search_matches.is_empty() {
-                        self.clear_search();
-                    } else {
-                        self.should_quit = true;
-                    }
-                }
-                KeyCode::Tab => {
-                    // Tab to switch to next sheet, Shift+Tab for previous
-                    if modifiers.contains(KeyModifiers::SHIFT) {
-                        let _ = self.switch_to_prev_sheet();
-                    } else {
-                        let _ = self.switch_to_next_sheet();
-                    }
-                }
-                KeyCode::BackTab => {
-                    // BackTab is another way to detect Shift+Tab on some terminals
-                    let _ = self.switch_to_prev_sheet();
-                }
-                KeyCode::Up => self.move_up(),
-                KeyCode::Down => self.move_down(),
-                KeyCode::Left => self.move_left(),
-                KeyCode::Right => self.move_right(),
-                KeyCode::Home => {
-                    if modifiers.contains(KeyModifiers::CONTROL) {
-                        self.move_to_top();
-                    } else {
-                        self.move_to_start_of_row();
-                    }
-                }
-                KeyCode::End => {
-                    if modifiers.contains(KeyModifiers::CONTROL) {
-                        self.move_to_bottom();
-                    } else {
-                        self.move_to_end_of_row();
-                    }
-                }
-                KeyCode::PageUp => self.page_up(10),
-                KeyCode::PageDown => self.page_down(10),
-                _ => {}
             }
         }
     }
