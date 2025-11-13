@@ -501,7 +501,11 @@ impl TuiState {
     const LAZY_LOADING_THRESHOLD: usize = 1000; // Use lazy loading for sheets with >1000 rows
     const ROW_CACHE_SIZE: usize = 200; // Cache 200 rows at a time for lazy loading
 
-    pub fn new(mut workbook: Workbook, initial_sheet_name: &str, config: &crate::config::Config) -> Result<Self> {
+    pub fn new(
+        mut workbook: Workbook,
+        initial_sheet_name: &str,
+        config: &crate::config::Config,
+    ) -> Result<Self> {
         let sheet_names = workbook.sheet_names();
         let current_sheet_index = sheet_names
             .iter()
@@ -987,7 +991,12 @@ impl TuiState {
     }
 
     /// Check if a key press matches a configured action
-    fn key_matches(&self, code: KeyCode, modifiers: crossterm::event::KeyModifiers, action: &str) -> bool {
+    fn key_matches(
+        &self,
+        code: KeyCode,
+        modifiers: crossterm::event::KeyModifiers,
+        action: &str,
+    ) -> bool {
         if let Some((expected_code, expected_mods)) = self.config.get_keybinding(action) {
             code == expected_code && modifiers == expected_mods
         } else {
@@ -1895,11 +1904,9 @@ pub fn run_tui(workbook: Workbook, sheet_name: &str, config: &crate::config::Con
     // Setup terminal
     enable_raw_mode().context("Failed to enable terminal raw mode. Is this a proper TTY?")?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)
-        .context("Failed to enter alternate screen mode")?;
+    execute!(stdout, EnterAlternateScreen).context("Failed to enter alternate screen mode")?;
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)
-        .context("Failed to initialize terminal backend")?;
+    let mut terminal = Terminal::new(backend).context("Failed to initialize terminal backend")?;
 
     // Create app state
     let mut app = TuiState::new(workbook, sheet_name, config)?;

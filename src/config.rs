@@ -8,6 +8,7 @@ use std::path::PathBuf;
 /// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct Config {
     pub theme: ThemeConfig,
     pub ui: UiConfig,
@@ -41,16 +42,6 @@ pub struct KeybindingsConfig {
     /// Custom keybindings (overrides profile)
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub custom: HashMap<String, String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            theme: ThemeConfig::default(),
-            ui: UiConfig::default(),
-            keybindings: KeybindingsConfig::default(),
-        }
-    }
 }
 
 impl Default for ThemeConfig {
@@ -133,13 +124,18 @@ impl Config {
             .context("Failed to get config directory")?;
 
         // Create config directory if it doesn't exist
-        fs::create_dir_all(config_dir)
-            .with_context(|| format!("Failed to create config directory: {}", config_dir.display()))?;
+        fs::create_dir_all(config_dir).with_context(|| {
+            format!(
+                "Failed to create config directory: {}",
+                config_dir.display()
+            )
+        })?;
 
         // Generate example config
         let example = Self::example_toml();
-        fs::write(&config_path, example)
-            .with_context(|| format!("Failed to write example config: {}", config_path.display()))?;
+        fs::write(&config_path, example).with_context(|| {
+            format!("Failed to write example config: {}", config_path.display())
+        })?;
 
         Ok(config_path)
     }
@@ -189,7 +185,8 @@ profile = "default"
 # jump_to_bottom = "G"
 # jump_to_row_start = "0"
 # jump_to_row_end = "$"
-"#.to_string()
+"#
+        .to_string()
     }
 
     /// Get keybinding for an action based on profile and custom overrides
@@ -502,10 +499,7 @@ page_up = "Ctrl+b"
         // but we should parse them correctly
         assert_eq!(
             parse_key_string("Ctrl+Shift+Tab"),
-            Some((
-                KeyCode::Tab,
-                KeyModifiers::CONTROL | KeyModifiers::SHIFT
-            ))
+            Some((KeyCode::Tab, KeyModifiers::CONTROL | KeyModifiers::SHIFT))
         );
 
         assert_eq!(
