@@ -4,7 +4,8 @@ use prettytable::{Cell, Row, Table, format};
 
 /// Format a cell value with width limiting
 fn format_cell_value(value: &str, max_width: usize, wrap: bool) -> String {
-    if value.len() <= max_width {
+    let char_count = value.chars().count();
+    if char_count <= max_width {
         return value.to_string();
     }
 
@@ -13,16 +14,18 @@ fn format_cell_value(value: &str, max_width: usize, wrap: bool) -> String {
         // We'll truncate with a note. Full wrapping would require custom rendering.
         // Future: implement multi-line cell support
         if max_width > 3 {
-            format!("{}...", &value[..max_width - 3])
+            let truncated: String = value.chars().take(max_width - 3).collect();
+            format!("{}...", truncated)
         } else {
-            value[..max_width].to_string()
+            value.chars().take(max_width).collect()
         }
     } else {
         // Truncate with "..."
         if max_width > 3 {
-            format!("{}...", &value[..max_width - 3])
+            let truncated: String = value.chars().take(max_width - 3).collect();
+            format!("{}...", truncated)
         } else {
-            value[..max_width].to_string()
+            value.chars().take(max_width).collect()
         }
     }
 }
