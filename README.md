@@ -18,6 +18,7 @@ Inspired by [doxx](https://github.com/bgreenwell/doxx), `xleak` brings Excel spr
 - **Interactive TUI mode** - full keyboard navigation with ratatui
 - **Smart data type handling** - numbers right-aligned, text left-aligned, booleans centered
 - **Multi-sheet support** - seamlessly navigate between sheets (Tab/Shift+Tab)
+- **Excel Table support** - list and extract named tables (.xlsx only)
 - **Multiple export formats** - CSV, JSON, plain text
 - **Blazing fast** - powered by `calamine`, the fastest Excel parser in Rust
 - **Multiple file formats** - supports `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`
@@ -130,6 +131,21 @@ xleak data.xlsx --export json > output.json
 
 # Export as plain text (tab-separated)
 xleak data.xlsx --export text > output.txt
+```
+
+#### Work with Excel Tables (.xlsx only)
+```bash
+# List all tables in a workbook
+xleak workbook.xlsx --list-tables
+
+# Extract a specific table as JSON (default)
+xleak workbook.xlsx --table "Sales"
+
+# Extract table as CSV
+xleak workbook.xlsx --table "Sales" --export csv > sales.csv
+
+# Extract table as plain text
+xleak workbook.xlsx --table "Employees" --export text
 ```
 
 #### Combine options

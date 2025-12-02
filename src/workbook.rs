@@ -1,5 +1,5 @@
-use anyhow::{Context, Result};
-use calamine::{Data, Range, Reader, Sheets, open_workbook_auto};
+use anyhow::{anyhow, Context, Result};
+use calamine::{Data, Range, Reader, Sheets, Table, open_workbook_auto};
 use chrono::{Duration, NaiveDate};
 use std::path::Path;
 
@@ -45,6 +45,53 @@ impl Workbook {
             range,
             formula_range,
         ))
+    }
+
+    // ===== Table API (Xlsx only) =====
+
+    /// Load table metadata from the workbook (Xlsx only)
+    pub fn load_tables(&mut self) -> Result<()> {
+        match &mut self.sheets {
+            Sheets::Xlsx(xlsx) => xlsx
+                .load_tables()
+                .context("Failed to load table metadata")
+                .map_err(|e| anyhow!("{e}")),
+            _ => Err(anyhow!("Tables are only supported in .xlsx files")),
+        }
+    }
+
+    /// Get all table names in the workbook (Xlsx only)
+    pub fn table_names(&self) -> Result<Vec<String>> {
+        match &self.sheets {
+            Sheets::Xlsx(xlsx) => Ok(xlsx.table_names().iter().map(|s| (*s).clone()).collect()),
+            _ => Err(anyhow!("Tables are only supported in .xlsx files")),
+        }
+    }
+
+    /// Get table names in a specific sheet (Xlsx only)
+    pub fn table_names_in_sheet(&self, sheet_name: &str) -> Result<Vec<String>> {
+        match &self.sheets {
+            Sheets::Xlsx(xlsx) => Ok(xlsx
+                .table_names_in_sheet(sheet_name)
+                .iter()
+                .map(|s| (*s).clone())
+                .collect()),
+            _ => Err(anyhow!("Tables are only supported in .xlsx files")),
+        }
+    }
+
+    /// Get table data by name (Xlsx only)
+    pub fn table_by_name(&mut self, table_name: &str) -> Result<TableData> {
+        match &mut self.sheets {
+            Sheets::Xlsx(xlsx) => {
+                let table = xlsx
+                    .table_by_name(table_name)
+                    .map_err(|e| anyhow!("Table '{table_name}' not found: {e}"))?;
+
+                Ok(TableData::from_calamine_table(table))
+            }
+            _ => Err(anyhow!("Tables are only supported in .xlsx files")),
+        }
     }
 }
 
@@ -220,6 +267,36 @@ impl CellValue {
                     )
                 }
             }
+        }
+    }
+}
+
+/// Excel Table data
+#[derive(Debug, Clone)]
+pub struct TableData {
+    pub name: String,
+    pub sheet_name: String,
+    pub headers: Vec<String>,
+    pub rows: Vec<Vec<CellValue>>,
+}
+
+impl TableData {
+    pub fn from_calamine_table(table: Table<Data>) -> Self {
+        let name = table.name().to_string();
+        let sheet_name = table.sheet_name().to_string();
+        let headers = table.columns().to_vec();
+
+        let rows: Vec<Vec<CellValue>> = table
+            .data()
+            .rows()
+            .map(|row| row.iter().map(SheetData::datatype_to_cellvalue).collect())
+            .collect();
+
+        Self {
+            name,
+            sheet_name,
+            headers,
+            rows,
         }
     }
 }
