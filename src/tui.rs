@@ -482,6 +482,7 @@ pub struct TuiState {
     column_widths: Vec<usize>,       // Cached column widths for horizontal scroll
     show_help: bool,                 // Help overlay visible
     show_cell_detail: bool,          // Cell detail popup visible
+    cell_detail_scroll: usize,       // Scroll offset for cell detail popup
     // Search state
     search_mode: bool,                   // Whether we're in search input mode
     search_query: String,                // Current search query
@@ -550,6 +551,7 @@ impl TuiState {
             column_widths: Vec::new(),
             show_help: false,
             show_cell_detail: false,
+            cell_detail_scroll: 0,
             search_mode: false,
             search_query: String::new(),
             search_matches: Vec::new(),
@@ -1102,9 +1104,30 @@ impl TuiState {
                 return;
             }
 
-            // If cell detail is showing, any key closes it
+            // If cell detail is showing, handle scrolling or close
             if self.show_cell_detail {
-                self.show_cell_detail = false;
+                match code {
+                    KeyCode::Up => {
+                        self.cell_detail_scroll = self.cell_detail_scroll.saturating_sub(1);
+                    }
+                    KeyCode::Down => {
+                        self.cell_detail_scroll = self.cell_detail_scroll.saturating_add(1);
+                    }
+                    KeyCode::PageUp => {
+                        self.cell_detail_scroll = self.cell_detail_scroll.saturating_sub(10);
+                    }
+                    KeyCode::PageDown => {
+                        self.cell_detail_scroll = self.cell_detail_scroll.saturating_add(10);
+                    }
+                    KeyCode::Home => {
+                        self.cell_detail_scroll = 0;
+                    }
+                    _ => {
+                        // Any other key closes the detail view
+                        self.show_cell_detail = false;
+                        self.cell_detail_scroll = 0;
+                    }
+                }
                 return;
             }
 
@@ -1179,6 +1202,7 @@ impl TuiState {
                 self.enter_jump_mode();
             } else if self.key_matches(code, modifiers, "show_cell_detail") {
                 self.show_cell_detail = true;
+                self.cell_detail_scroll = 0;
             } else if self.key_matches(code, modifiers, "next_sheet") {
                 let _ = self.switch_to_next_sheet();
             } else if self.key_matches(code, modifiers, "prev_sheet") || code == KeyCode::BackTab {
@@ -1932,7 +1956,7 @@ impl TuiState {
 
         detail_lines.push(Line::from(""));
         detail_lines.push(Line::from(vec![Span::styled(
-            "Press any key to close",
+            "↑↓ to scroll | Any other key to close",
             Style::default()
                 .fg(Color::Magenta)
                 .add_modifier(Modifier::ITALIC),
@@ -1944,6 +1968,14 @@ impl TuiState {
         let popup_height =
             (detail_lines.len() + 4).min(area.height.saturating_sub(2) as usize) as u16;
 
+        // Calculate content area (inside borders)
+        let content_height = popup_height.saturating_sub(2) as usize; // Subtract borders
+        let total_lines = detail_lines.len();
+
+        // Clamp scroll offset to valid range
+        let max_scroll = total_lines.saturating_sub(content_height);
+        let scroll_offset = self.cell_detail_scroll.min(max_scroll);
+
         let popup_area = Rect {
             x: (area.width.saturating_sub(popup_width)) / 2,
             y: (area.height.saturating_sub(popup_height)) / 2,
@@ -1954,9 +1986,36 @@ impl TuiState {
         // Clear the area behind the popup
         frame.render_widget(Clear, popup_area);
 
-        // Create detail content
+        // Build title with scroll indicator
+        let mut title_spans = vec![
+            Span::raw(" "),
+            Span::styled(
+                "Cell Details",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" - "),
+            Span::styled(cell_addr.clone(), Style::default().fg(Color::Cyan)),
+        ];
+
+        // Add scroll indicator if content is scrollable
+        if total_lines > content_height {
+            let scroll_info = format!(" [{}/{}]", scroll_offset + 1, max_scroll + 1);
+            title_spans.push(Span::styled(
+                scroll_info,
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
+            ));
+        }
+
+        title_spans.push(Span::raw(" "));
+
+        // Create detail content with scroll
         let detail_paragraph = Paragraph::new(detail_lines)
             .style(Style::default().fg(Color::White).bg(Color::Black))
+            .scroll((scroll_offset as u16, 0))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -1965,18 +2024,7 @@ impl TuiState {
                             .fg(Color::Cyan)
                             .add_modifier(Modifier::BOLD),
                     )
-                    .title(vec![
-                        Span::raw(" "),
-                        Span::styled(
-                            "Cell Details",
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                        Span::raw(" - "),
-                        Span::styled(cell_addr, Style::default().fg(Color::Cyan)),
-                        Span::raw(" "),
-                    ])
+                    .title(title_spans)
                     .title_alignment(Alignment::Center),
             )
             .wrap(Wrap { trim: false });
