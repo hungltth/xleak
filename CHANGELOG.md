@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--config` flag to specify custom configuration file location
 - Excel Table support (.xlsx only) with `--list-tables` and `--table` flags (thanks [@jgranduel](https://github.com/jgranduel)! [#18](https://github.com/bgreenwell/xleak/issues/18), [#21](https://github.com/bgreenwell/xleak/pull/21))
 - Horizontal scrolling mode with auto-sized columns via `-H` flag (thanks [@YannickHerrero](https://github.com/YannickHerrero)! [#13](https://github.com/bgreenwell/xleak/pull/13))
+- Scrollable cell detail popup for viewing multi-line cells (thanks [@ket000](https://github.com/ket000)! [#16](https://github.com/bgreenwell/xleak/issues/16))
 - MIT License (thanks [@hardBSDk](https://github.com/hardBSDk) and [@hwpplayer1](https://github.com/hwpplayer1)! [#6](https://github.com/bgreenwell/xleak/issues/6))
 
 ### Changed
