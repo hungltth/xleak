@@ -103,10 +103,9 @@ fn main() -> Result<()> {
         wb.load_tables()?;
         let table_data = wb.table_by_name(table_name)?;
 
-        // Export table data in requested format
+        // Display or export table data
         match cli.export.as_deref() {
-            Some("json") | None => {
-                // Default to JSON for table extraction
+            Some("json") => {
                 export_table_json(&table_data)?;
             }
             Some("csv") => {
@@ -117,6 +116,10 @@ fn main() -> Result<()> {
             }
             Some(format) => {
                 anyhow::bail!("Unknown export format: {format}. Use: csv, json, or text");
+            }
+            None => {
+                // Default: display table in terminal (like sheets)
+                display_table_data(&table_data, cli.max_rows)?;
             }
         }
         return Ok(());
@@ -191,6 +194,86 @@ fn main() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+/// Display table data in terminal (default behavior)
+fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()> {
+    use prettytable::{Cell, Row, Table, format};
+
+    // Print header info
+    println!("\n╔═════════════════════════════════════════════════╗");
+    println!("║  xleak - Excel Table Viewer                     ║");
+    println!("╚═════════════════════════════════════════════════╝");
+    println!();
+    println!(
+        "Table: {} (from sheet: {})",
+        table.name, table.sheet_name
+    );
+    println!("{} rows × {} columns", table.rows.len(), table.headers.len());
+    println!();
+
+    // Create prettytable
+    let mut pt = Table::new();
+    pt.set_format(*format::consts::FORMAT_BOX_CHARS);
+
+    // Add headers
+    let header_cells: Vec<Cell> = table
+        .headers
+        .iter()
+        .map(|h| Cell::new(h).style_spec("Fgbc"))
+        .collect();
+    pt.set_titles(Row::new(header_cells));
+
+    // Add data rows (limit if needed)
+    let rows_to_show = if max_rows == 0 {
+        table.rows.len()
+    } else {
+        std::cmp::min(max_rows, table.rows.len())
+    };
+
+    for row in table.rows.iter().take(rows_to_show) {
+        let cells: Vec<Cell> = row
+            .iter()
+            .map(|cell| {
+                let cell_obj = Cell::new(&cell.to_string());
+                // Style based on type
+                match cell {
+                    workbook::CellValue::Int(_) | workbook::CellValue::Float(_) => {
+                        cell_obj.style_spec("Fr") // Right-aligned numbers
+                    }
+                    workbook::CellValue::Bool(_) => {
+                        cell_obj.style_spec("Fc") // Centered booleans
+                    }
+                    workbook::CellValue::Error(_) => {
+                        cell_obj.style_spec("Frc") // Red errors, centered
+                    }
+                    _ => cell_obj,
+                }
+            })
+            .collect();
+        pt.add_row(Row::new(cells));
+    }
+
+    pt.printstd();
+
+    // Show row count summary
+    println!();
+    if rows_to_show < table.rows.len() {
+        println!(
+            "⚠️  Showing {} of {} rows (use -n 0 to show all)",
+            rows_to_show,
+            table.rows.len()
+        );
+    } else {
+        println!(
+            "Total: {} rows × {} columns",
+            table.rows.len(),
+            table.headers.len()
+        );
+    }
+
+    println!();
     Ok(())
 }
 
