@@ -359,16 +359,16 @@ jobs:
             app_name=$(echo "$release" | jq -r '.app_name')
             version=$(echo "$release" | jq -r '.app_version')
 
-            # Find MSI file for x86_64-pc-windows-msvc
-            msi_file=$(echo "$release" | jq -r '.artifacts[] | select(contains("x86_64-pc-windows-msvc") and endswith(".msi"))')
+            # Find ZIP file for x86_64-pc-windows-msvc (Scoop needs portable archives, not MSI)
+            zip_file=$(echo "$release" | jq -r '.artifacts[] | select(contains("x86_64-pc-windows-msvc") and endswith(".zip"))')
 
-            if [ -n "$msi_file" ]; then
+            if [ -n "$zip_file" ]; then
               # Find corresponding SHA256 file
-              sha_file="${msi_file}.sha256"
+              sha_file="${zip_file}.sha256"
 
               if [ -f "bucket/${sha_file}" ]; then
                 sha256=$(cat "bucket/${sha_file}" | cut -d ' ' -f 1)
-                download_url="https://github.com/bgreenwell/xleak/releases/download/v${version}/${msi_file}"
+                download_url="https://github.com/bgreenwell/xleak/releases/download/v${version}/${zip_file}"
 
                 # Generate Scoop manifest using jq
                 jq -n \
@@ -393,7 +393,7 @@ jobs:
                     autoupdate: {
                       architecture: {
                         "64bit": {
-                          url: "https://github.com/bgreenwell/xleak/releases/download/v$version/xleak-x86_64-pc-windows-msvc.msi"
+                          url: "https://github.com/bgreenwell/xleak/releases/download/v$version/xleak-x86_64-pc-windows-msvc.zip"
                         }
                       }
                     }
