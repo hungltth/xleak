@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - UTF-8 character boundary panic with multi-byte characters like German umlauts (thanks [@steffenbusch](https://github.com/steffenbusch)! [#11](https://github.com/bgreenwell/xleak/issues/11), [#15](https://github.com/bgreenwell/xleak/pull/15))
 - VIM key bindings for `Shift+G` and `$` not working properly (thanks [@hungltth](https://github.com/hungltth)! [#20](https://github.com/bgreenwell/xleak/pull/20))
+- Nix installation from GitHub by adding missing `flake.lock` (thanks [@senorsmile](https://github.com/senorsmile)! [#17](https://github.com/bgreenwell/xleak/issues/17))
 - Double keypress issue on Windows by filtering key release events (thanks [@clindholm](https://github.com/clindholm)! [#2](https://github.com/bgreenwell/xleak/issues/2), [#4](https://github.com/bgreenwell/xleak/pull/4))
 - Needless borrow in table lookup (clippy warning)
 
