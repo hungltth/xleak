@@ -370,32 +370,34 @@ jobs:
                 sha256=$(cat "bucket/${sha_file}" | cut -d ' ' -f 1)
                 download_url="https://github.com/bgreenwell/xleak/releases/download/v${version}/${msi_file}"
 
-                # Generate Scoop manifest
-                cat > "bucket/${app_name}.json" <<'MANIFEST'
-{
-  "version": "'"${version}"'",
-  "description": "A fast terminal Excel viewer with interactive TUI, search, formulas, and export capabilities",
-  "homepage": "https://github.com/bgreenwell/xleak",
-  "license": "MIT",
-  "architecture": {
-    "64bit": {
-      "url": "'"${download_url}"'",
-      "hash": "'"${sha256}"'"
-    }
-  },
-  "bin": "xleak.exe",
-  "checkver": {
-    "github": "https://github.com/bgreenwell/xleak"
-  },
-  "autoupdate": {
-    "architecture": {
-      "64bit": {
-        "url": "https://github.com/bgreenwell/xleak/releases/download/v$version/xleak-x86_64-pc-windows-msvc.msi"
-      }
-    }
-  }
-}
-MANIFEST
+                # Generate Scoop manifest using jq
+                jq -n \
+                  --arg version "${version}" \
+                  --arg url "${download_url}" \
+                  --arg hash "${sha256}" \
+                  '{
+                    version: $version,
+                    description: "A fast terminal Excel viewer with interactive TUI, search, formulas, and export capabilities",
+                    homepage: "https://github.com/bgreenwell/xleak",
+                    license: "MIT",
+                    architecture: {
+                      "64bit": {
+                        url: $url,
+                        hash: $hash
+                      }
+                    },
+                    bin: "xleak.exe",
+                    checkver: {
+                      github: "https://github.com/bgreenwell/xleak"
+                    },
+                    autoupdate: {
+                      architecture: {
+                        "64bit": {
+                          url: "https://github.com/bgreenwell/xleak/releases/download/v$version/xleak-x86_64-pc-windows-msvc.msi"
+                        }
+                      }
+                    }
+                  }' > "bucket/${app_name}.json"
 
                 git add "bucket/${app_name}.json"
                 git commit -m "${app_name} ${version}" || echo "Nothing to commit for ${app_name}"
