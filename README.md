@@ -34,38 +34,71 @@ Inspired by [doxx](https://github.com/bgreenwell/doxx), `xleak` brings Excel spr
 
 ## Installation
 
-### Via Homebrew (macOS/Linux)
+### Package Managers
+
+**macOS / Linux (Homebrew):**
 ```bash
-brew tap bgreenwell/xleak
-brew install xleak
+brew install bgreenwell/tap/xleak
 ```
 
-### Via Cargo
+**Windows (Scoop):**
+```powershell
+scoop bucket add bgreenwell https://github.com/bgreenwell/scoop-bucket
+scoop install xleak
+```
+
+**Arch Linux (AUR):**
+```bash
+# Using yay
+yay -S xleak-bin
+
+# Or using paru
+paru -S xleak-bin
+```
+
+**Cargo (all platforms):**
 ```bash
 cargo install xleak
 ```
 
-### Via Nix
+**Nix:**
 ```bash
 # Run directly
 nix run github:bgreenwell/xleak -- file.xlsx
 
 # Install with flakes
 nix profile install github:bgreenwell/xleak
+```
 
-# Or enter dev shell
-nix develop github:bgreenwell/xleak
+### Quick Install Scripts
+
+**macOS / Linux:**
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/bgreenwell/xleak/releases/latest/download/xleak-installer.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://github.com/bgreenwell/xleak/releases/latest/download/xleak-installer.ps1 | iex
 ```
 
 ### Pre-built Binaries
-Download pre-built binaries for Windows, Linux, and macOS from the [latest release](https://github.com/bgreenwell/xleak/releases/latest).
+
+Download platform-specific binaries from the [latest release](https://github.com/bgreenwell/xleak/releases/latest):
+
+- **macOS**: Universal binary (Apple Silicon + Intel)
+- **Linux**: x86_64 (glibc and musl)
+- **Windows**: x86_64 MSI installer or standalone `.exe`
 
 ### Build from Source
+
 ```bash
 git clone https://github.com/bgreenwell/xleak.git
 cd xleak
 cargo install --path .
 ```
+
+**Requirements:** Rust 1.70 or later
 
 ## Usage
 
