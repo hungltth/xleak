@@ -377,7 +377,7 @@ impl std::fmt::Display for CellValue {
                     let frac = d.fract();
                     if frac.abs() > 0.000001 {
                         // Has time component
-                        let total_seconds = (frac * 86400.0) as u32;
+                        let total_seconds = (frac * 86400.0).round() as u32;
                         let hours = total_seconds / 3600;
                         let minutes = (total_seconds % 3600) / 60;
                         let seconds = total_seconds % 60;
