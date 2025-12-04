@@ -306,6 +306,8 @@ cargo install --path .
 
 xleak uses [cargo-dist](https://github.com/axodotdev/cargo-dist) for automated release builds and distribution. Most installers are automatically published when a version tag is pushed.
 
+See [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) for the complete step-by-step checklist. You can also create a GitHub issue using the "Release" template to track each release.
+
 ### Distribution Channels
 
 **Automated (via cargo-dist + GitHub Actions):**

@@ -1,0 +1,50 @@
+---
+name: Bug Report
+about: Report a bug or issue with xleak
+title: '[BUG] '
+labels: bug
+assignees: ''
+
+---
+
+## Description
+
+<!-- A clear and concise description of what the bug is -->
+
+## Steps to Reproduce
+
+1.
+2.
+3.
+
+## Expected Behavior
+
+<!-- What you expected to happen -->
+
+## Actual Behavior
+
+<!-- What actually happened -->
+
+## Environment
+
+- **xleak version**: <!-- Run `xleak --version` -->
+- **OS**: <!-- e.g., macOS 14.0, Ubuntu 22.04, Windows 11 -->
+- **Installation method**: <!-- Homebrew, Scoop, cargo install, etc. -->
+
+## Excel File Details (if applicable)
+
+- **File format**: <!-- .xlsx, .xls, .ods, etc. -->
+- **File size**:
+- **Number of sheets**:
+- **Can you share the file?**: <!-- Yes/No - if yes, please attach or provide link -->
+
+## Error Message
+
+<!-- If there's an error message, paste it here -->
+```
+Paste error message here
+```
+
+## Additional Context
+
+<!-- Add any other context about the problem here, screenshots, etc. -->
