@@ -20,9 +20,8 @@ targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-da
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Publish jobs to run in CI
-publish-jobs = ["homebrew"]
+publish-jobs = ["homebrew", "cargo"]
 # Note: Scoop publishing is handled by custom publish-scoop-manifest job in release.yml
-# Uncomment to enable crates.io publishing (requires CARGO_REGISTRY_TOKEN secret)
-# publish-jobs = ["homebrew", "cargo"]
+# crates.io publishing enabled (requires CARGO_REGISTRY_TOKEN secret)
 # Whether to install an updater program
 install-updater = true

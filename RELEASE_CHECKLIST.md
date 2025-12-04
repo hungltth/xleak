@@ -31,6 +31,7 @@ Use this checklist when preparing a new release of xleak. You can also create a 
   - [ ] SHA256 checksum files
 - [ ] Homebrew formula published to [bgreenwell/homebrew-tap](https://github.com/bgreenwell/homebrew-tap)
 - [ ] Scoop manifest published to [bgreenwell/scoop-bucket](https://github.com/bgreenwell/scoop-bucket)
+- [ ] Published to crates.io: https://crates.io/crates/xleak
 
 ## Manual: Publish to AUR
 
