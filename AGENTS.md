@@ -57,7 +57,15 @@ wb.load_sheet(&sheet_name)
 
 Use `--release` builds for testing. Cargo.toml configured for max optimization (opt-level=3, lto=true). For large files, use `-n` limit.
 
-## Commit Guidelines
+## Development Workflow
+
+**Branching:**
+- Create feature branches for new features: `feature/add-csv-support`
+- Create bugfix branches for fixes: `fix/windows-help-popup`
+- Submit pull requests to `main` branch
+- Direct commits to `main` allowed only for: releases, hotfixes, minor docs
+
+**Commit Guidelines:**
 
 Use conventional commits: `type: description` where type is `feat`, `fix`, `docs`, `refactor`, `test`, or `chore`.
 
