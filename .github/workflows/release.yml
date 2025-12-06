@@ -324,90 +324,6 @@ jobs:
           done
           git push
 
-  publish-scoop-manifest:
-    needs:
-      - plan
-      - host
-    runs-on: "ubuntu-22.04"
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PLAN: ${{ needs.plan.outputs.val }}
-      GITHUB_USER: "axo bot"
-      GITHUB_EMAIL: "admin+bot@axo.dev"
-    if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-          repository: "bgreenwell/scoop-bucket"
-          token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
-      - name: Fetch scoop manifests
-        uses: actions/download-artifact@v4
-        with:
-          pattern: artifacts-*
-          path: bucket/
-          merge-multiple: true
-      - name: Generate and commit manifest
-        run: |
-          git config --global user.name "${GITHUB_USER}"
-          git config --global user.email "${GITHUB_EMAIL}"
-
-          # Create bucket directory if it doesn't exist
-          mkdir -p bucket
-
-          for release in $(echo "$PLAN" | jq --compact-output '.releases[]'); do
-            app_name=$(echo "$release" | jq -r '.app_name')
-            version=$(echo "$release" | jq -r '.app_version')
-
-            # Find ZIP file for x86_64-pc-windows-msvc (Scoop needs portable archives, not MSI)
-            zip_file=$(echo "$release" | jq -r '.artifacts[] | select(contains("x86_64-pc-windows-msvc") and endswith(".zip"))')
-
-            if [ -n "$zip_file" ]; then
-              # Find corresponding SHA256 file
-              sha_file="${zip_file}.sha256"
-
-              if [ -f "bucket/${sha_file}" ]; then
-                sha256=$(cat "bucket/${sha_file}" | cut -d ' ' -f 1)
-                download_url="https://github.com/bgreenwell/xleak/releases/download/v${version}/${zip_file}"
-
-                # Generate Scoop manifest using jq
-                jq -n \
-                  --arg version "${version}" \
-                  --arg url "${download_url}" \
-                  --arg hash "${sha256}" \
-                  '{
-                    version: $version,
-                    description: "A fast terminal Excel viewer with interactive TUI, search, formulas, and export capabilities",
-                    homepage: "https://github.com/bgreenwell/xleak",
-                    license: "MIT",
-                    architecture: {
-                      "64bit": {
-                        url: $url,
-                        hash: $hash
-                      }
-                    },
-                    bin: "xleak.exe",
-                    checkver: {
-                      github: "https://github.com/bgreenwell/xleak"
-                    },
-                    autoupdate: {
-                      architecture: {
-                        "64bit": {
-                          url: "https://github.com/bgreenwell/xleak/releases/download/v$version/xleak-x86_64-pc-windows-msvc.zip"
-                        }
-                      }
-                    }
-                  }' > "bucket/${app_name}.json"
-
-                git add "bucket/${app_name}.json"
-                git commit -m "${app_name} ${version}" || echo "Nothing to commit for ${app_name}"
-              else
-                echo "Warning: SHA256 file not found: bucket/${sha_file}"
-              fi
-            fi
-          done
-          git push
-
   publish-crates-io:
     needs:
       - plan
@@ -435,12 +351,11 @@ jobs:
       - plan
       - host
       - publish-homebrew-formula
-      - publish-scoop-manifest
       - publish-crates-io
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' && (needs.publish-homebrew-formula.result == 'skipped' || needs.publish-homebrew-formula.result == 'success') && (needs.publish-scoop-manifest.result == 'skipped' || needs.publish-scoop-manifest.result == 'success') && (needs.publish-crates-io.result == 'skipped' || needs.publish-crates-io.result == 'success') }}
+    if: ${{ always() && needs.host.result == 'success' && (needs.publish-homebrew-formula.result == 'skipped' || needs.publish-homebrew-formula.result == 'success') && (needs.publish-crates-io.result == 'skipped' || needs.publish-crates-io.result == 'success') }}
     runs-on: "ubuntu-22.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

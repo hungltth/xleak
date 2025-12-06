@@ -12,7 +12,7 @@ Use this checklist when preparing a new release of xleak. You can also create a 
   - [ ] Keep `[Unreleased]` section empty for future changes
   - [ ] Verify changelog entries are accurate and complete
 - [ ] Version bumped in `Cargo.toml`
-- [ ] Test binary works: `cargo run --release -- test_data.xlsx`
+- [ ] Test binary works: `cargo run --release -- tests/fixtures/test_comprehensive.xlsx`
 
 ## Create Release
 
@@ -20,50 +20,35 @@ Use this checklist when preparing a new release of xleak. You can also create a 
 - [ ] Push to main: `git push`
 - [ ] Create version tag: `git tag vX.Y.Z`
 - [ ] Push tag: `git push origin vX.Y.Z`
-- [ ] Wait for GitHub Actions workflow to complete (~5-10 minutes)
+- [ ] Wait for GitHub Actions workflows to complete (~10-15 minutes)
 
 ## Verify Automated Releases
 
-- [ ] GitHub Release created with release notes
-- [ ] All artifacts present in GitHub Release:
-  - [ ] Binaries for all platforms (Linux, macOS, Windows)
-  - [ ] Tarballs (.tar.xz, .tar.gz)
-  - [ ] ZIP archive for Windows
+All of the following are now automated via GitHub Actions:
+
+- [ ] **GitHub Release** created at https://github.com/bgreenwell/xleak/releases/tag/vX.Y.Z
+  - [ ] All platform binaries present (Linux, macOS, Windows)
+  - [ ] Tarballs (.tar.xz, .tar.gz) and ZIP archive
   - [ ] MSI installer for Windows
   - [ ] Shell/PowerShell installer scripts
   - [ ] SHA256 checksum files
-- [ ] Homebrew formula published to [bgreenwell/homebrew-tap](https://github.com/bgreenwell/homebrew-tap)
-- [ ] Scoop manifest published to [bgreenwell/scoop-bucket](https://github.com/bgreenwell/scoop-bucket)
-- [ ] Published to crates.io: https://crates.io/crates/xleak
 
-## Manual: Publish to AUR
+- [ ] **Homebrew** formula published to [bgreenwell/homebrew-tap](https://github.com/bgreenwell/homebrew-tap)
+  - Automated by: `publish-homebrew-formula` job in release.yml
 
-- [ ] Generate PKGBUILD: `cargo aur`
-- [ ] Get SHA256 hash from release:
-  ```bash
-  RELEASE_URL="https://github.com/bgreenwell/xleak/releases/download/vX.Y.Z/xleak-x86_64-unknown-linux-gnu.tar.xz.sha256"
-  SHA256=$(curl -sL "$RELEASE_URL" | cut -d' ' -f1)
-  echo $SHA256
-  ```
-- [ ] Update PKGBUILD in `target/cargo-aur/`:
-  - [ ] Update source URL to point to correct tarball
-  - [ ] Update `sha256sums` with hash from above
-  - [ ] Verify `pkgver` matches release version
-- [ ] Copy to AUR repo: `cp target/cargo-aur/PKGBUILD ~/xleak-bin/`
-- [ ] Generate .SRCINFO using Docker:
-  ```bash
-  docker run --rm -v ~/xleak-bin:/build archlinux:latest /bin/bash -c \
-    "useradd -m builder && cd /build && chown -R builder:builder . && \
-     su builder -c 'makepkg --printsrcinfo' > .SRCINFO"
-  ```
-- [ ] Commit and push to AUR:
-  ```bash
-  cd ~/xleak-bin
-  git add PKGBUILD .SRCINFO
-  git commit -m "Update to vX.Y.Z"
-  git push origin master
-  ```
-- [ ] Verify package appears on [AUR web interface](https://aur.archlinux.org/packages/xleak-bin)
+- [ ] **Scoop** manifest published to [bgreenwell/scoop-bucket](https://github.com/bgreenwell/scoop-bucket)
+  - Automated by: `.github/workflows/publish-scoop.yml`
+
+- [ ] **crates.io** published at https://crates.io/crates/xleak
+  - Automated by: `publish-crates-io` job in release.yml
+
+- [ ] **AUR** package updated at [xleak-bin](https://aur.archlinux.org/packages/xleak-bin)
+  - Automated by: `.github/workflows/publish-aur.yml`
+  - PKGBUILD and .SRCINFO auto-generated and pushed
+
+- [ ] **WinGet** manifest PR created to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs)
+  - Automated by: `.github/workflows/publish-winget.yml`
+  - **Note:** PR may require manual merge approval from Microsoft team (1-2 days)
 
 ## Test Installations
 
@@ -87,6 +72,13 @@ Use this checklist when preparing a new release of xleak. You can also create a 
   xleak --version
   ```
 
+- [ ] **WinGet (Windows)**:
+  ```powershell
+  winget upgrade bgreenwell.xleak
+  xleak --version
+  ```
+  **Note:** May take 1-2 days for WinGet PR to be merged
+
 - [ ] **Shell installer (Linux/macOS)**:
   ```bash
   curl --proto '=https' --tlsv1.2 -LsSf \
@@ -97,19 +89,49 @@ Use this checklist when preparing a new release of xleak. You can also create a 
 
 ## Post-Release
 
-- [ ] Announce release (if applicable):
-  - [ ] Reddit (r/rust, r/commandline)
-  - [ ] Twitter/X
-  - [ ] Hacker News (for major releases)
-- [ ] Update README.md if installation instructions changed
+- [ ] All automated workflows completed successfully (check GitHub Actions)
+- [ ] Announcement published (if applicable)
+- [ ] Documentation updated if needed
 - [ ] Close release tracking issue
 
 ## Troubleshooting
 
-If something goes wrong, see the **Troubleshooting Releases** section in AGENTS.md.
+### Common Issues
 
-Common issues:
-- **GitHub Actions fails**: Check workflow logs for specific error
-- **Scoop installation broken**: Verify manifest uses `.zip` file, not `.msi`
-- **AUR build fails**: Double-check source URL and SHA256 hash
-- **Homebrew formula outdated**: Check homebrew-tap repo for commit
+**GitHub Actions fails:**
+- Check workflow logs for specific error
+- Verify all secrets are configured: `HOMEBREW_TAP_TOKEN`, `SCOOP_BUCKET_TOKEN`, `CARGO_REGISTRY_TOKEN`, `AUR_SSH_PRIVATE_KEY`, `WINGET_TOKEN`
+
+**Scoop installation broken:**
+- Verify manifest in scoop-bucket uses `.zip` file
+- Check SHA256 hash matches release artifact
+
+**AUR automation fails:**
+- Check SSH key is valid: Secret `AUR_SSH_PRIVATE_KEY`
+- Verify PKGBUILD generation in workflow logs
+- Fallback: Manual publish (see old checklist in git history)
+
+**WinGet PR not appearing:**
+- Check `.github/workflows/publish-winget.yml` logs
+- Verify `WINGET_TOKEN` has correct permissions
+- May need to create PR manually with `komac update`
+
+**Homebrew formula outdated:**
+- Check [homebrew-tap repo](https://github.com/bgreenwell/homebrew-tap) for commit
+- Verify `HOMEBREW_TAP_TOKEN` secret is valid
+
+### Manual Intervention Required
+
+If automation fails for a specific channel, you can fall back to manual publishing:
+
+- **AUR Manual Process**: See git history of this file (commit before automation)
+- **WinGet Manual Process**: Use `komac update` CLI tool
+- **Scoop Manual Process**: Manually edit bucket/xleak.json in scoop-bucket repo
+
+### Workflow Summaries
+
+For detailed workflow information, see:
+- `.github/workflows/release.yml` - Main release, Homebrew, crates.io
+- `.github/workflows/publish-scoop.yml` - Scoop bucket
+- `.github/workflows/publish-aur.yml` - AUR publishing
+- `.github/workflows/publish-winget.yml` - WinGet manifests

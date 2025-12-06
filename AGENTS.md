@@ -109,11 +109,16 @@ cargo install --path .
 
 ## Release Process
 
-xleak uses cargo-dist for automated releases. See [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) for complete instructions. Create a GitHub issue using the "Release" template to track progress.
+xleak uses cargo-dist for automated releases. All distribution channels are now automated. See [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) for complete instructions. Create a GitHub issue using the "Release" template to track progress.
 
 **Distribution channels:**
-- Automated: GitHub Releases, Homebrew, Scoop, MSI, shell/PowerShell installers
-- Manual: AUR (Arch User Repository)
+- GitHub Releases, Homebrew, Scoop, WinGet, crates.io, AUR (all automated)
+
+**Workflows:**
+- `.github/workflows/release.yml` - Main release, Homebrew, crates.io
+- `.github/workflows/publish-scoop.yml` - Scoop bucket
+- `.github/workflows/publish-aur.yml` - AUR repository
+- `.github/workflows/publish-winget.yml` - WinGet manifests
 
 ## Questions or Issues?
 

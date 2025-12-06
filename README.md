@@ -51,6 +51,11 @@ scoop bucket add bgreenwell https://github.com/bgreenwell/scoop-bucket
 scoop install xleak
 ```
 
+**Windows (WinGet):** _(Coming soon - pending initial PR merge)_
+```powershell
+winget install bgreenwell.xleak
+```
+
 **Arch Linux (AUR):**
 ```bash
 # Using yay

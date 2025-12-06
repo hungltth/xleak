@@ -26,7 +26,7 @@
         # Define the package
         xleak = pkgs.rustPlatform.buildRustPackage rec {
           pname = "xleak";
-          version = "0.1.0";
+          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
 
           src = ./.;
 
@@ -37,7 +37,7 @@
 
           meta = with pkgs.lib; {
             description = "Terminal Excel viewer with interactive TUI, search, formulas, and export";
-            homepage = "https://github.com/greenwbm/xleak";
+            homepage = "https://github.com/bgreenwell/xleak";
             license = licenses.mit;
             maintainers = [ ];
             platforms = platforms.all;
@@ -79,35 +79,35 @@
           
           # Development shell hook
           shellHook = ''
-            echo "❄️ Welcome to the xleak Nix development environment!"
+            echo "Welcome to the xleak Nix development environment!"
             echo ""
-            echo "📋 Dependencies loaded:"
+            echo "Dependencies loaded:"
             echo "  - Rust ${rustToolchain.version} with clippy, rustfmt, rust-src"
             echo "  - ratatui for terminal UI"
             echo "  - crossterm for cross-platform terminal"
             echo "  - arboard for clipboard support"
             echo "  - calamine for Excel parsing"
             echo ""
-            echo "❄️ Nix commands:"
+            echo "Nix commands:"
             echo "  nix build                - Build the project"
             echo "  nix run                  - Run xleak"
             echo "  nix run . -- --help      - Run with help flag"
             echo "  nix develop              - Enter this dev shell"
             echo "  nix flake check          - Run all checks (fmt, clippy, build)"
             echo ""
-            echo "📄 Usage examples:"
+            echo "Usage examples:"
             echo "  nix run . -- spreadsheet.xlsx"
             echo "  nix run . -- spreadsheet.xlsx --sheet Sales"
             echo "  nix run . -- spreadsheet.xlsx --search 'keyword'"
             echo "  nix run . -- spreadsheet.xlsx --export csv"
             echo ""
-            echo "🔧 Development commands (if you need them):"
+            echo "Development commands (if you need them):"
             echo "  cargo build              - Direct build (uses Nix env)"
             echo "  cargo watch -x run       - Live reload during development"
             echo "  cargo clippy             - Run linter"
             echo "  cargo fmt                - Format code"
             echo ""
-            echo "💡 Pro tip: 'nix run github:greenwbm/xleak -- file.xlsx' to run from anywhere!"
+            echo "Pro tip: 'nix run github:bgreenwell/xleak -- file.xlsx' to run from anywhere!"
             echo ""
           '';
         };

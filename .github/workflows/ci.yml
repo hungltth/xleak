@@ -45,6 +45,9 @@ jobs:
       - name: Check build
         run: cargo build --release
 
+      - name: Run tests
+        run: cargo test --verbose
+
       # Nix build
       - name: Install Nix
         if: matrix.os != 'windows-latest'

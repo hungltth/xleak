@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Automated AUR (Arch User Repository) publishing via GitHub Actions - eliminates 7 manual steps per release
+- WinGet support for Windows package manager with automated PR creation to microsoft/winget-pkgs
+- Standalone Scoop publishing workflow for better maintainability
+
+### Changed
+- Nix flake now dynamically reads version from Cargo.toml instead of hardcoded value
+- Split Scoop publishing into separate workflow (`.github/workflows/publish-scoop.yml`)
+- Removed `allow-dirty` configuration from cargo-dist setup, enabling safe upgrades
+- Updated all release documentation to reflect fully automated process
+
+### Fixed
+- Nix flake homepage URL now correctly points to bgreenwell/xleak (was greenwbm/xleak)
+- Nix flake version now stays in sync with Cargo.toml automatically
+
 ## [0.2.5] - 2025-12-04
 
 ### Fixed

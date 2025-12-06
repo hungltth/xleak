@@ -1,0 +1,41 @@
+name: Publish to WinGet
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g., v0.2.5)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish-winget:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.release.prerelease }}
+
+    steps:
+      - name: Determine release version
+        id: get-version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to WinGet
+        uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: bgreenwell.xleak
+          version: ${{ steps.get-version.outputs.version }}
+          installers-regex: '\.msi$'
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: bgreenwell
