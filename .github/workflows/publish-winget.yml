@@ -34,6 +34,6 @@ jobs:
       - name: Publish to WinGet with Komac
         uses: michidk/run-komac@v2
         with:
-          args: 'update --package-id bgreenwell.xleak --version ${{ steps.get-version.outputs.version }} --urls "https://github.com/bgreenwell/xleak/releases/download/${{ steps.get-version.outputs.tag }}/xleak-x86_64-pc-windows-msvc.msi" --submit'
+          args: 'update --version ${{ steps.get-version.outputs.version }} --urls "https://github.com/bgreenwell/xleak/releases/download/${{ steps.get-version.outputs.tag }}/xleak-x86_64-pc-windows-msvc.msi" --submit bgreenwell.xleak'
         env:
           GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
