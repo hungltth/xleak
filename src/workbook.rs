@@ -3,56 +3,148 @@ use calamine::{Data, Range, Reader, Sheets, Table, open_workbook_auto};
 use chrono::{Duration, NaiveDate};
 use std::path::Path;
 
+/// Attempts to parse a string into a numeric CellValue, otherwise returns it as a String.
+fn parse_string_to_cellvalue(s: &str) -> CellValue {
+    if s.is_empty() {
+        return CellValue::Empty;
+    }
+    // Try parsing as an integer first
+    if let Ok(i) = s.parse::<i64>() {
+        return CellValue::Int(i);
+    }
+    // Then try as a float
+    if let Ok(f) = s.parse::<f64>() {
+        return CellValue::Float(f);
+    }
+    // Default to a string
+    CellValue::String(s.to_string())
+}
+
+/// Loads a CSV file into a CsvData object.
+fn load_csv_data(path: &Path) -> Result<CsvData> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_path(path)?;
+
+    let headers = reader
+        .headers()?
+        .iter()
+        .map(String::from)
+        .collect::<Vec<String>>();
+    let width = headers.len();
+
+    let mut rows = Vec::new();
+    for result in reader.records() {
+        let record = result?;
+        let row: Vec<CellValue> = record.iter().map(parse_string_to_cellvalue).collect();
+        rows.push(row);
+    }
+
+    let height = rows.len();
+
+    let sheet_data = SheetData {
+        headers,
+        rows,
+        formulas: vec![vec![None; width]; height], // CSVs don't have formulas
+        width,
+        height,
+    };
+
+    let name = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("data")
+        .to_string();
+
+    Ok(CsvData {
+        name,
+        data: sheet_data,
+    })
+}
+
+// +++++ Refactored Workbook and Data Structures +++++
+
+#[derive(Debug, Clone)]
+pub struct CsvData {
+    pub name: String,
+    pub data: SheetData,
+}
+
+pub enum DataSource {
+    Excel(Sheets<std::io::BufReader<std::fs::File>>),
+    Csv(CsvData),
+}
+
 pub struct Workbook {
-    sheets: Sheets<std::io::BufReader<std::fs::File>>,
+    pub source: DataSource,
 }
 
 impl Workbook {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let sheets = open_workbook_auto(path.as_ref()).context("Failed to open workbook")?;
+        let path = path.as_ref();
+        let source = if path.extension().and_then(|s| s.to_str()) == Some("csv") {
+            let csv_data = load_csv_data(path).with_context(|| "Failed to load CSV file")?;
+            DataSource::Csv(csv_data)
+        } else {
+            let sheets = open_workbook_auto(path).context("Failed to open workbook")?;
+            DataSource::Excel(sheets)
+        };
 
-        Ok(Self { sheets })
+        Ok(Self { source })
     }
 
     pub fn sheet_names(&self) -> Vec<String> {
-        self.sheets.sheet_names()
+        match &self.source {
+            DataSource::Excel(sheets) => sheets.sheet_names(),
+            DataSource::Csv(csv_data) => vec![csv_data.name.clone()],
+        }
     }
 
     /// Loads all rows eagerly into memory
     pub fn load_sheet(&mut self, name: &str) -> Result<SheetData> {
-        let range = self
-            .sheets
-            .worksheet_range(name)
-            .with_context(|| format!("Sheet '{name}' not found"))?;
-
-        // Try to load formulas, but don't fail if they're not available
-        let formula_range = self.sheets.worksheet_formula(name).ok();
-
-        Ok(SheetData::from_range_with_formulas(range, formula_range))
+        match &mut self.source {
+            DataSource::Excel(sheets) => {
+                let range = sheets
+                    .worksheet_range(name)
+                    .with_context(|| format!("Sheet '{name}' not found"))?;
+                let formula_range = sheets.worksheet_formula(name).ok();
+                Ok(SheetData::from_range_with_formulas(range, formula_range))
+            }
+            DataSource::Csv(csv_data) => {
+                if csv_data.name == name {
+                    Ok(csv_data.data.clone())
+                } else {
+                    Err(anyhow!("Sheet '{name}' not found in CSV."))
+                }
+            }
+        }
     }
 
     /// Loads only headers; rows fetched on demand
     pub fn load_sheet_lazy(&mut self, name: &str) -> Result<LazySheetData> {
-        let range = self
-            .sheets
-            .worksheet_range(name)
-            .with_context(|| format!("Sheet '{name}' not found"))?;
-
-        // Try to load formulas, but don't fail if they're not available
-        let formula_range = self.sheets.worksheet_formula(name).ok();
-
-        Ok(LazySheetData::from_range_with_formulas(
-            range,
-            formula_range,
-        ))
+        match &mut self.source {
+            DataSource::Excel(sheets) => {
+                let range = sheets
+                    .worksheet_range(name)
+                    .with_context(|| format!("Sheet '{name}' not found"))?;
+                let formula_range = sheets.worksheet_formula(name).ok();
+                Ok(LazySheetData::from_excel(range, formula_range))
+            }
+            DataSource::Csv(csv_data) => {
+                if csv_data.name == name {
+                    Ok(LazySheetData::from_csv(csv_data.data.clone()))
+                } else {
+                    Err(anyhow!("Sheet '{name}' not found in CSV."))
+                }
+            }
+        }
     }
 
     // ===== Table API (Xlsx only) =====
 
-    /// Load table metadata from the workbook (Xlsx only)
     pub fn load_tables(&mut self) -> Result<()> {
-        match &mut self.sheets {
-            Sheets::Xlsx(xlsx) => xlsx
+        match &mut self.source {
+            DataSource::Excel(Sheets::Xlsx(xlsx)) => xlsx
                 .load_tables()
                 .context("Failed to load table metadata")
                 .map_err(|e| anyhow!("{e}")),
@@ -60,18 +152,18 @@ impl Workbook {
         }
     }
 
-    /// Get all table names in the workbook (Xlsx only)
     pub fn table_names(&self) -> Result<Vec<String>> {
-        match &self.sheets {
-            Sheets::Xlsx(xlsx) => Ok(xlsx.table_names().iter().map(|s| (*s).clone()).collect()),
+        match &self.source {
+            DataSource::Excel(Sheets::Xlsx(xlsx)) => {
+                Ok(xlsx.table_names().iter().map(|s| (*s).clone()).collect())
+            }
             _ => Err(anyhow!("Tables are only supported in .xlsx files")),
         }
     }
 
-    /// Get table names in a specific sheet (Xlsx only)
     pub fn table_names_in_sheet(&self, sheet_name: &str) -> Result<Vec<String>> {
-        match &self.sheets {
-            Sheets::Xlsx(xlsx) => Ok(xlsx
+        match &self.source {
+            DataSource::Excel(Sheets::Xlsx(xlsx)) => Ok(xlsx
                 .table_names_in_sheet(sheet_name)
                 .iter()
                 .map(|s| (*s).clone())
@@ -80,14 +172,12 @@ impl Workbook {
         }
     }
 
-    /// Get table data by name (Xlsx only)
     pub fn table_by_name(&mut self, table_name: &str) -> Result<TableData> {
-        match &mut self.sheets {
-            Sheets::Xlsx(xlsx) => {
+        match &mut self.source {
+            DataSource::Excel(Sheets::Xlsx(xlsx)) => {
                 let table = xlsx
                     .table_by_name(table_name)
                     .map_err(|e| anyhow!("Table '{table_name}' not found: {e}"))?;
-
                 Ok(TableData::from_calamine_table(table))
             }
             _ => Err(anyhow!("Tables are only supported in .xlsx files")),
@@ -105,24 +195,28 @@ pub struct SheetData {
     pub height: usize,
 }
 
+enum LazyDataSource {
+    Excel {
+        range: Range<Data>,
+        formula_range: Option<Range<String>>,
+    },
+    Csv {
+        data: SheetData,
+    },
+}
+
 /// Lazy-loaded sheet data (loads rows on demand)
 pub struct LazySheetData {
-    range: Range<Data>,
-    formula_range: Option<Range<String>>,
+    source: LazyDataSource,
     pub headers: Vec<String>,
     pub width: usize,
     pub height: usize,
 }
 
 impl LazySheetData {
-    /// Extracts headers only; defers row loading
-    pub fn from_range_with_formulas(
-        range: Range<Data>,
-        formula_range: Option<Range<String>>,
-    ) -> Self {
+    /// Create lazy data from an Excel range
+    pub fn from_excel(range: Range<Data>, formula_range: Option<Range<String>>) -> Self {
         let (height, width) = range.get_size();
-
-        // Only extract headers (first row) - don't load all data yet
         let headers = if height > 0 {
             range
                 .rows()
@@ -134,11 +228,23 @@ impl LazySheetData {
         };
 
         Self {
-            range,
-            formula_range,
+            source: LazyDataSource::Excel {
+                range,
+                formula_range,
+            },
             headers,
             width,
-            height: height.saturating_sub(1), // Don't count header row
+            height: height.saturating_sub(1),
+        }
+    }
+
+    /// Create "lazy" data from already-loaded CSV data
+    pub fn from_csv(data: SheetData) -> Self {
+        Self {
+            headers: data.headers.clone(),
+            width: data.width,
+            height: data.height,
+            source: LazyDataSource::Csv { data },
         }
     }
 
@@ -148,42 +254,69 @@ impl LazySheetData {
         start: usize,
         count: usize,
     ) -> (Vec<Vec<CellValue>>, Vec<Vec<Option<String>>>) {
+        match &self.source {
+            LazyDataSource::Excel {
+                range,
+                formula_range,
+            } => self.get_excel_rows(start, count, range, formula_range),
+            LazyDataSource::Csv { data } => self.get_csv_rows(start, count, data),
+        }
+    }
+
+    fn get_csv_rows(
+        &self,
+        start: usize,
+        count: usize,
+        data: &SheetData,
+    ) -> (Vec<Vec<CellValue>>, Vec<Vec<Option<String>>>) {
+        let end = (start + count).min(self.height);
+        let rows = data.rows[start..end].to_vec();
+        let formulas = data.formulas[start..end].to_vec();
+        (rows, formulas)
+    }
+
+    fn get_excel_rows(
+        &self,
+        start: usize,
+        count: usize,
+        range: &Range<Data>,
+        formula_range: &Option<Range<String>>,
+    ) -> (Vec<Vec<CellValue>>, Vec<Vec<Option<String>>>) {
         let end = (start + count).min(self.height);
 
-        // Extract requested rows (skip header + start rows, take count)
-        let rows: Vec<Vec<CellValue>> = self
-            .range
+        let rows: Vec<Vec<CellValue>> = range
             .rows()
-            .skip(1 + start) // Skip header + start offset
+            .skip(1 + start)
             .take(end - start)
             .map(|row| row.iter().map(SheetData::datatype_to_cellvalue).collect())
             .collect();
 
-        // Extract formulas for requested rows
-        let formulas = self.get_formulas_for_range(start, end);
+        let formulas = self.get_formulas_for_range(start, end, formula_range);
 
         (rows, formulas)
     }
 
-    fn get_formulas_for_range(&self, start: usize, end: usize) -> Vec<Vec<Option<String>>> {
-        if let Some(ref formula_range) = self.formula_range {
+    fn get_formulas_for_range(
+        &self,
+        start: usize,
+        end: usize,
+        formula_range: &Option<Range<String>>,
+    ) -> Vec<Vec<Option<String>>> {
+        if let Some(formula_range) = formula_range {
             let formula_start = formula_range.start().unwrap_or((0, 0));
-            let total_height = self.height + 1; // Include header in total
+            let total_height = self.height + 1;
 
-            // Create formula grid only for requested rows
             let mut formula_grid: Vec<Vec<Option<String>>> =
                 vec![vec![None; self.width]; end - start];
 
-            // Populate formulas at their absolute positions
             for (row_offset, formula_row) in formula_range.rows().enumerate() {
                 let absolute_row = formula_start.0 as usize + row_offset;
 
                 if absolute_row > 0 && absolute_row <= total_height {
-                    let data_row_idx = absolute_row - 1; // Convert to 0-based data row index
+                    let data_row_idx = absolute_row - 1;
 
-                    // Only process if this row is in our requested range
                     if data_row_idx >= start && data_row_idx < end {
-                        let result_idx = data_row_idx - start; // Index in result array
+                        let result_idx = data_row_idx - start;
 
                         for (col_offset, formula_str) in formula_row.iter().enumerate() {
                             let absolute_col = formula_start.1 as usize + col_offset;
@@ -197,7 +330,6 @@ impl LazySheetData {
 
             formula_grid
         } else {
-            // No formulas available
             vec![vec![None; self.width]; end - start]
         }
     }
@@ -205,7 +337,13 @@ impl LazySheetData {
     /// Consumes lazy data and loads all rows into memory
     #[allow(clippy::wrong_self_convention)]
     pub fn to_sheet_data(self) -> SheetData {
-        SheetData::from_range_with_formulas(self.range, self.formula_range)
+        match self.source {
+            LazyDataSource::Excel {
+                range,
+                formula_range,
+            } => SheetData::from_range_with_formulas(range, formula_range),
+            LazyDataSource::Csv { data } => data,
+        }
     }
 }
 
@@ -248,9 +386,7 @@ impl CellValue {
             CellValue::Error(e) => format!("#{e}"),
             CellValue::DateTime(dt) => {
                 let days = dt.floor() as i64;
-                // Excel epoch: December 31, 1899 (Excel serial 0)
                 let epoch = NaiveDate::from_ymd_opt(1899, 12, 31).unwrap();
-                // Adjust for Excel's 1900 leap year bug (day 60 = Feb 29, 1900 which didn't exist)
                 let adjusted_days = if days > 60 { days - 1 } else { days };
                 let date = epoch + Duration::days(adjusted_days);
                 let time_fraction = dt.fract();
@@ -311,7 +447,6 @@ impl std::fmt::Display for CellValue {
             CellValue::Empty => write!(f, ""),
             CellValue::String(s) => write!(f, "{s}"),
             CellValue::Int(i) => {
-                // Format integers with thousand separators
                 let s = i.to_string();
                 let negative = s.starts_with('-');
                 let digits: String = s.trim_start_matches('-').chars().collect();
@@ -328,7 +463,6 @@ impl std::fmt::Display for CellValue {
                 write!(f, "{}", result.chars().rev().collect::<String>())
             }
             CellValue::Float(val) => {
-                // Format floats with thousand separators
                 let formatted = if val.fract() == 0.0 {
                     format!("{val:.0}")
                 } else {
@@ -356,34 +490,23 @@ impl std::fmt::Display for CellValue {
                 }
             }
             CellValue::Bool(b) => {
-                // Use lowercase for booleans
                 write!(f, "{}", if *b { "true" } else { "false" })
             }
             CellValue::Error(e) => write!(f, "ERROR: {e}"),
             CellValue::DateTime(d) => {
-                // Excel dates are days since December 31, 1899 (serial 0)
-                // Excel has a leap year bug where 1900 is incorrectly treated as a leap year
-                // Days > 60 need adjustment for this bug
                 let days = d.floor() as i64;
-
-                // Excel epoch: December 31, 1899 (Excel serial 0)
                 let excel_epoch = NaiveDate::from_ymd_opt(1899, 12, 31).unwrap();
-
-                // Adjust for Excel's 1900 leap year bug (day 60 = Feb 29, 1900 which didn't exist)
                 let adjusted_days = if days > 60 { days - 1 } else { days };
 
                 if let Some(date) = excel_epoch.checked_add_signed(Duration::days(adjusted_days)) {
-                    // Check if there's a time component
                     let frac = d.fract();
                     if frac.abs() > 0.000001 {
-                        // Has time component
                         let total_seconds = (frac * 86400.0).round() as u32;
                         let hours = total_seconds / 3600;
                         let minutes = (total_seconds % 3600) / 60;
                         let seconds = total_seconds % 60;
                         write!(f, "{} {:02}:{:02}:{:02}", date, hours, minutes, seconds)
                     } else {
-                        // Date only
                         write!(f, "{}", date)
                     }
                 } else {
@@ -401,7 +524,6 @@ impl SheetData {
     ) -> Self {
         let (height, width) = range.get_size();
 
-        // Extract headers from first row if it exists
         let headers = if height > 0 {
             range
                 .rows()
@@ -412,27 +534,20 @@ impl SheetData {
             vec![]
         };
 
-        // Extract data rows (skip first row as headers)
         let rows: Vec<Vec<CellValue>> = range
             .rows()
             .skip(1)
             .map(|row| row.iter().map(Self::datatype_to_cellvalue).collect())
             .collect();
 
-        // Extract formulas if available
-        // Note: Formula range may be sparse (only cells with formulas) and may have different start position
         let formulas: Vec<Vec<Option<String>>> = if let Some(formula_range) = formula_range {
             let formula_start = formula_range.start().unwrap_or((0, 0));
-
-            // Create empty formula structure matching data dimensions
             let mut formula_grid: Vec<Vec<Option<String>>> = vec![vec![None; width]; height];
 
-            // Populate formulas at their absolute positions
             for (row_offset, formula_row) in formula_range.rows().enumerate() {
                 let absolute_row = formula_start.0 as usize + row_offset;
                 if absolute_row > 0 && absolute_row <= height {
-                    // Skip header row (row 0)
-                    let data_row_idx = absolute_row - 1; // Convert to 0-based data row index
+                    let data_row_idx = absolute_row - 1;
                     for (col_offset, formula_str) in formula_row.iter().enumerate() {
                         let absolute_col = formula_start.1 as usize + col_offset;
                         if absolute_col < width && !formula_str.is_empty() {
@@ -442,14 +557,11 @@ impl SheetData {
                 }
             }
 
-            // Return formula grid matching data rows
-            // We already handled header row when populating, so just take the data rows
             formula_grid
                 .into_iter()
                 .take(height.saturating_sub(1))
                 .collect()
         } else {
-            // No formulas available, create empty parallel structure
             vec![vec![None; width]; height.saturating_sub(1)]
         };
 
@@ -458,7 +570,7 @@ impl SheetData {
             rows,
             formulas,
             width,
-            height: height.saturating_sub(1), // Don't count header row
+            height: height.saturating_sub(1),
         }
     }
 
@@ -578,37 +690,29 @@ mod tests {
 
     #[test]
     fn test_datetime_display() {
-        // Excel date: January 1, 1900 is day 1
         let val = CellValue::DateTime(1.0);
         let display = val.to_string();
-        // Should contain a date in YYYY-MM-DD format
         assert!(display.contains("1900") || display.contains("1899"));
     }
 
     #[test]
     fn test_datetime_with_time() {
-        // Excel datetime with time component
-        // Day 1 + 0.5 = 12:00:00 on Jan 1, 1900
         let val = CellValue::DateTime(1.5);
         let display = val.to_string();
-        // Should contain both date and time
         assert!(display.contains(":"));
-        assert!(display.len() > 10); // Date + time is longer than just date
+        assert!(display.len() > 10);
     }
 
     #[test]
     fn test_workbook_open_real_file() {
-        // Test with actual test file if it exists
         if let Ok(wb) = Workbook::open("tests/fixtures/test_data.xlsx") {
             let sheet_names = wb.sheet_names();
             assert!(!sheet_names.is_empty(), "Should have at least one sheet");
         }
-        // If file doesn't exist, test passes (integration test needs real file)
     }
 
     #[test]
     fn test_sheet_data_structure() {
-        // Test SheetData structure can be created
         let sheet = SheetData {
             headers: vec!["Name".to_string(), "Age".to_string()],
             rows: vec![

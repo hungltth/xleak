@@ -9,13 +9,13 @@ mod workbook;
 
 #[derive(Parser)]
 #[command(name = "xleak")]
-#[command(author, version, about = "Expose Excel files in your terminal - no Microsoft Excel required", long_about = None)]
+#[command(author, version, about = "A fast terminal viewer for Excel and CSV files.", long_about = None)]
 struct Cli {
-    /// Path to the Excel file (.xlsx, .xls, .xlsm, .ods)
+    /// Path to the data file (.xlsx, .xls, .xlsm, .ods, .csv)
     #[arg(value_name = "FILE")]
     file: PathBuf,
 
-    /// Sheet name or index to display (default: first sheet)
+    /// Sheet name or index to display (default: first sheet). For CSV, this is ignored.
     #[arg(short, long, value_name = "SHEET")]
     sheet: Option<String>,
 
@@ -27,7 +27,7 @@ struct Cli {
     #[arg(short = 'n', long, default_value = "50")]
     max_rows: usize,
 
-    /// Show formulas instead of values
+    /// Show formulas instead of values (ignored for CSV files)
     #[arg(short, long)]
     formulas: bool,
 
@@ -71,10 +71,11 @@ fn main() -> Result<()> {
         anyhow::bail!("File not found: {}", cli.file.display());
     }
 
-    // Load the workbook
-    let mut wb = workbook::Workbook::open(&cli.file).context("Failed to open Excel file")?;
+    // Open the workbook (handles both Excel and CSV)
+    let mut wb = workbook::Workbook::open(&cli.file)
+        .with_context(|| format!("Failed to open file '{}'", cli.file.display()))?;
 
-    // Handle table operations (xlsx only)
+    // Handle table operations (Excel-only)
     if cli.list_tables {
         wb.load_tables()?;
         let table_names = wb.table_names()?;
@@ -85,13 +86,13 @@ fn main() -> Result<()> {
             println!("Sheet\tTable");
             println!("-----\t-----");
             for table_name in &table_names {
-                // Get which sheet this table is in
                 let sheet_names = wb.sheet_names();
                 for sheet in &sheet_names {
-                    let tables_in_sheet = wb.table_names_in_sheet(sheet)?;
-                    if tables_in_sheet.contains(table_name) {
-                        println!("{sheet}\t{table_name}");
-                        break;
+                    if let Ok(tables_in_sheet) = wb.table_names_in_sheet(sheet) {
+                        if tables_in_sheet.contains(table_name) {
+                            println!("{sheet}\t{table_name}");
+                            break;
+                        }
                     }
                 }
             }
@@ -103,7 +104,6 @@ fn main() -> Result<()> {
         wb.load_tables()?;
         let table_data = wb.table_by_name(table_name)?;
 
-        // Handle export formats (non-interactive)
         if let Some(format) = cli.export.as_deref() {
             match format {
                 "json" => export_table_json(&table_data)?,
@@ -116,46 +116,37 @@ fn main() -> Result<()> {
 
         if cli.interactive {
             anyhow::bail!(
-                "Interactive mode (-i) is not supported with --table.\n\
-                 \n\
-                 Options:\n\
-                 • View table in terminal: xleak file.xlsx --table \"{table_name}\"\n\
-                 • View full sheet in TUI: xleak file.xlsx --sheet \"{}\" -i",
+                "Interactive mode (-i) is not supported with --table.\n\nOptions:\n• View table in terminal: xleak file.xlsx --table \"{table_name}\"\n• View full sheet in TUI: xleak file.xlsx --sheet \"{}\" -i",
                 table_data.sheet_name
             );
         }
 
-        // Default: display table in terminal
         display_table_data(&table_data, cli.max_rows)?;
         return Ok(());
     }
 
-    // Get sheet names (clone to avoid borrow issues)
+    // Get sheet names and determine which one to show
     let sheet_names = wb.sheet_names();
     if sheet_names.is_empty() {
-        anyhow::bail!("No sheets found in workbook");
+        anyhow::bail!("No data found in file");
     }
 
-    // Determine which sheet to display
     let sheet_name = if let Some(ref name) = cli.sheet {
-        // Try as name first
         if sheet_names.iter().any(|s| s == name) {
             name.clone()
-        } else {
-            // Try as index
-            if let Ok(idx) = name.parse::<usize>() {
-                if idx > 0 && idx <= sheet_names.len() {
-                    sheet_names[idx - 1].clone()
-                } else {
-                    anyhow::bail!("Sheet index {} out of range (1-{})", idx, sheet_names.len());
-                }
+        } else if let Ok(idx) = name.parse::<usize>() {
+            if idx > 0 && idx <= sheet_names.len() {
+                sheet_names[idx - 1].clone()
             } else {
-                anyhow::bail!(
-                    "Sheet '{}' not found. Available sheets: {}",
-                    name,
-                    sheet_names.join(", ")
-                );
+                anyhow::bail!("Sheet index {} out of range (1-{})", idx, sheet_names.len());
             }
+        }
+        else {
+            anyhow::bail!(
+                "Sheet '{}' not found. Available: {}",
+                name,
+                sheet_names.join(", ")
+            );
         }
     } else {
         sheet_names[0].clone()
@@ -163,28 +154,19 @@ fn main() -> Result<()> {
 
     // Display, export, or run TUI
     if cli.interactive {
-        // Interactive TUI mode - pass the workbook so it can switch sheets
         tui::run_tui(wb, &sheet_name, &config, cli.horizontal_scroll)?;
     } else {
-        // Load the sheet data for non-interactive modes
         let data = wb
             .load_sheet(&sheet_name)
             .with_context(|| format!("Failed to load sheet '{sheet_name}'"))?;
         match cli.export.as_deref() {
-            Some("csv") => {
-                display::export_csv(&data)?;
-            }
-            Some("json") => {
-                display::export_json(&data, &sheet_name)?;
-            }
-            Some("text") => {
-                display::export_text(&data)?;
-            }
+            Some("csv") => display::export_csv(&data)?,
+            Some("json") => display::export_json(&data, &sheet_name)?,
+            Some("text") => display::export_text(&data)?,
             Some(format) => {
                 anyhow::bail!("Unknown export format: {format}. Use: csv, json, or text");
             }
             None => {
-                // Non-interactive display
                 let sheet_names_refs: Vec<&str> = sheet_names.iter().map(|s| s.as_str()).collect();
                 display::display_table(
                     &data,
@@ -206,7 +188,6 @@ fn main() -> Result<()> {
 fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()> {
     use prettytable::{Cell, Row, Table, format};
 
-    // Print header info
     println!("\n╔═════════════════════════════════════════════════╗");
     println!("║  xleak - Excel Table Viewer                     ║");
     println!("╚═════════════════════════════════════════════════╝");
@@ -219,11 +200,9 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
     );
     println!();
 
-    // Create prettytable
     let mut pt = Table::new();
     pt.set_format(*format::consts::FORMAT_BOX_CHARS);
 
-    // Add headers
     let header_cells: Vec<Cell> = table
         .headers
         .iter()
@@ -231,7 +210,6 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
         .collect();
     pt.set_titles(Row::new(header_cells));
 
-    // Add data rows (limit if needed)
     let rows_to_show = if max_rows == 0 {
         table.rows.len()
     } else {
@@ -243,17 +221,12 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
             .iter()
             .map(|cell| {
                 let cell_obj = Cell::new(&cell.to_string());
-                // Style based on type
                 match cell {
                     workbook::CellValue::Int(_) | workbook::CellValue::Float(_) => {
-                        cell_obj.style_spec("Fr") // Right-aligned numbers
+                        cell_obj.style_spec("Fr")
                     }
-                    workbook::CellValue::Bool(_) => {
-                        cell_obj.style_spec("Fc") // Centered booleans
-                    }
-                    workbook::CellValue::Error(_) => {
-                        cell_obj.style_spec("Frc") // Red errors, centered
-                    }
+                    workbook::CellValue::Bool(_) => cell_obj.style_spec("Fc"),
+                    workbook::CellValue::Error(_) => cell_obj.style_spec("Frc"),
                     _ => cell_obj,
                 }
             })
@@ -263,7 +236,6 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
 
     pt.printstd();
 
-    // Show row count summary
     println!();
     if rows_to_show < table.rows.len() {
         println!(
@@ -285,6 +257,7 @@ fn display_table_data(table: &workbook::TableData, max_rows: usize) -> Result<()
 
 /// Export table data as JSON
 fn export_table_json(table: &workbook::TableData) -> Result<()> {
+    // This function remains unchanged
     println!("{{");
     println!("  \"table\": \"{}\",", table.name);
     println!("  \"sheet\": \"{}\",", table.sheet_name);
@@ -297,7 +270,6 @@ fn export_table_json(table: &workbook::TableData) -> Result<()> {
     }
     println!("  ],");
     println!("  \"data\": [");
-
     for (i, row) in table.rows.iter().enumerate() {
         print!("    [");
         for (j, cell) in row.iter().enumerate() {
@@ -317,25 +289,20 @@ fn export_table_json(table: &workbook::TableData) -> Result<()> {
         let comma = if i < table.rows.len() - 1 { "," } else { "" };
         println!("]{comma}");
     }
-
     println!("  ]");
     println!("}}");
-
     Ok(())
 }
 
 /// Export table data as CSV
 fn export_table_csv(table: &workbook::TableData) -> Result<()> {
-    // Print headers
+    // This function remains unchanged
     println!("{}", table.headers.join(","));
-
-    // Print rows
     for row in &table.rows {
         let row_str: Vec<String> = row
             .iter()
             .map(|cell| {
                 let val = cell.to_raw_string();
-                // Quote if contains comma or quotes
                 if val.contains(',') || val.contains('"') {
                     format!("\"{}\"", val.replace('"', "\"\""))
                 } else {
@@ -345,20 +312,16 @@ fn export_table_csv(table: &workbook::TableData) -> Result<()> {
             .collect();
         println!("{}", row_str.join(","));
     }
-
     Ok(())
 }
 
 /// Export table data as plain text (tab-separated)
 fn export_table_text(table: &workbook::TableData) -> Result<()> {
-    // Print headers
+    // This function remains unchanged
     println!("{}", table.headers.join("\t"));
-
-    // Print rows
     for row in &table.rows {
         let row_str: Vec<String> = row.iter().map(|cell| cell.to_raw_string()).collect();
         println!("{}", row_str.join("\t"));
     }
-
     Ok(())
 }

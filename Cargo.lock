@@ -1816,6 +1816,7 @@ dependencies = [
  "chrono",
  "clap",
  "crossterm",
+ "csv",
  "dirs",
  "prettytable-rs",
  "ratatui",
